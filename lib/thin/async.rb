@@ -7,10 +7,15 @@ module Thin
       def initialize
         @queue = []
         @buffered = 0
+        @on_written = []
       end
 
       def buffered
         @buffered
+      end
+
+      def on_write &block
+        @on_written << block
       end
 
       def call(body)
@@ -34,6 +39,9 @@ module Thin
             body.each do |chunk|
               @buffered -= chunk.length
               @body_callback.call(chunk)
+            end
+            @on_written.each do |cb|
+              cb.call
             end
             schedule_dequeue unless @queue.empty?
           end
@@ -64,7 +72,6 @@ module Thin
       @headers = headers
       @headers_sent = false
       @done = false
-      @on_written = []
 
       if block_given?
         yield self
@@ -80,14 +87,13 @@ module Thin
     def write(body)
       send_headers
       @body.call(body.respond_to?(:each) ? body : [body])
-      @on_written.each do |cb|
-        cb.call
-      end
     end
     alias :<< :write
 
     def on_write &block
-      @on_written << block
+      @body.on_write do
+        block.call
+      end
     end
 
     def buffered
