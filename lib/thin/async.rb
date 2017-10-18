@@ -15,7 +15,9 @@ module Thin
 
       def call(body)
         @queue << body
-        @buffered += body.length
+        body.each do |chunk|
+          @buffered += chunk.length
+        end
         schedule_dequeue
       end
 
@@ -29,8 +31,8 @@ module Thin
           return unless @body_callback
           EM.next_tick do
             next unless body = @queue.shift
-            @buffered -= body.length
             body.each do |chunk|
+              @buffered -= chunk.length
               @body_callback.call(chunk)
             end
             schedule_dequeue unless @queue.empty?
