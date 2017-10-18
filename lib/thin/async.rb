@@ -64,6 +64,7 @@ module Thin
       @headers = headers
       @headers_sent = false
       @done = false
+      @on_written = []
 
       if block_given?
         yield self
@@ -79,8 +80,15 @@ module Thin
     def write(body)
       send_headers
       @body.call(body.respond_to?(:each) ? body : [body])
+      @on_written.each do |cb|
+        cb.call
+      end
     end
     alias :<< :write
+
+    def on_write &block
+      @on_written << block
+    end
 
     def buffered
       @body.buffered
