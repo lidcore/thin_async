@@ -6,10 +6,16 @@ module Thin
 
       def initialize
         @queue = []
+        @buffered = 0
+      end
+
+      def buffered
+        @buffered
       end
 
       def call(body)
         @queue << body
+        @buffered += body.length
         schedule_dequeue
       end
 
@@ -23,6 +29,7 @@ module Thin
           return unless @body_callback
           EM.next_tick do
             next unless body = @queue.shift
+            @buffered -= body.length
             body.each do |chunk|
               @body_callback.call(chunk)
             end
@@ -72,6 +79,10 @@ module Thin
       @body.call(body.respond_to?(:each) ? body : [body])
     end
     alias :<< :write
+
+    def buffered
+      @body.buffered
+    end
 
     # Tell Thin the response is complete and the connection can be closed.
     def done
